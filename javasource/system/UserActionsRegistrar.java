@@ -35,7 +35,6 @@ public class UserActionsRegistrar
     registrator.registerUserAction(communitycommons.actions.executeMicroflowAsUser.class);
     registrator.registerUserAction(communitycommons.actions.executeMicroflowAsUser_1.class);
     registrator.registerUserAction(communitycommons.actions.executeMicroflowAsUser_2.class);
-    registrator.registerUserAction(communitycommons.actions.executeMicroflowInBackground.class);
     registrator.registerUserAction(communitycommons.actions.executeMicroflowInBatches.class);
     registrator.registerUserAction(communitycommons.actions.FileDocumentFromFile.class);
     registrator.registerUserAction(communitycommons.actions.FileFromFileDocument.class);
@@ -62,7 +61,6 @@ public class UserActionsRegistrar
     registrator.registerUserAction(communitycommons.actions.MergeMultiplePdfs.class);
     registrator.registerUserAction(communitycommons.actions.objectHasChanged.class);
     registrator.registerUserAction(communitycommons.actions.objectIsNew.class);
-    registrator.registerUserAction(communitycommons.actions.OverlayPdfDocument.class);
     registrator.registerUserAction(communitycommons.actions.ParseDateTimeWithTimezone.class);
     registrator.registerUserAction(communitycommons.actions.RandomHash.class);
     registrator.registerUserAction(communitycommons.actions.RandomString.class);
