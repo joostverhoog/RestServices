@@ -27,8 +27,6 @@ import com.google.common.collect.Maps;
 import com.mendix.core.Core;
 import com.mendix.core.CoreException;
 import com.mendix.m2ee.api.IMxRuntimeResponse;
-import com.mendix.systemwideinterfaces.connectionbus.requests.IRetrievalSchema;
-import com.mendix.systemwideinterfaces.connectionbus.requests.ISortExpression.SortDirection;
 import com.mendix.systemwideinterfaces.core.IContext;
 import com.mendix.systemwideinterfaces.core.IMendixIdentifier;
 import com.mendix.systemwideinterfaces.core.IMendixObject;
@@ -154,7 +152,7 @@ public class DataService {
 		if (def.getEnableChangeLog())
 			serveListingFromIndex(rsr, includeData, offset, limit);
 		else
-			serveListingFromDB(rsr, includeData, offset, limit);
+			serveListingFromDB(rsr, offset, limit);
 
 		rsr.datawriter.endArray();
 		rsr.endDoc();
@@ -186,14 +184,8 @@ public class DataService {
 			});
 	}
 
-	private void serveListingFromDB(RestServiceRequest rsr, boolean includeData, int baseoffset, int limit) throws Exception {
-		IRetrievalSchema schema = Core.createRetrievalSchema();
+	private void serveListingFromDB(RestServiceRequest rsr, int baseoffset, int limit) throws Exception {
 		boolean hasOffset = baseoffset >= 0;
-
-		if (!includeData) {
-			schema.addSortExpression(getKeyAttribute(), SortDirection.ASC);
-			schema.addMetaPrimitiveName(getKeyAttribute());
-		}
 
 		int offset = hasOffset ? baseoffset : 0;
 
@@ -202,23 +194,11 @@ public class DataService {
 
 		do {
 			int amount = hasOffset && limit > 0 ? Math.min(baseoffset + limit - offset, RestServices.BATCHSIZE) : RestServices.BATCHSIZE;
-			schema.setOffset(offset);
-			schema.setAmount(amount);
 
-			result = !includeData
-					? Core.retrieveXPathQuery(rsr.getContext(), xpath, amount, offset, ImmutableMap.of(getKeyAttribute(), "ASC"))
-					: Core.retrieveXPathSchema(rsr.getContext(), xpath , schema, false);
+			result = Core.retrieveXPathQuery(rsr.getContext(), xpath, amount, offset, ImmutableMap.of(getKeyAttribute(), "ASC"));
 
 			for(IMendixObject item : result) {
-				if (!includeData) {
-					if (!Utils.isValidKey(getKey(rsr.getContext(), item)))
-						continue;
-
-					rsr.datawriter.value(getObjecturl(rsr.getContext(), item));
-				}
-				else {
-					rsr.datawriter.value(serializeToJson(rsr.getContext(), item));
-				}
+				rsr.datawriter.value(serializeToJson(rsr.getContext(), item));
 			}
 
 			offset += result.size();
