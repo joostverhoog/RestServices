@@ -2,9 +2,6 @@ package restservices.util;
 
 import java.util.HashMap;
 
-import org.json.JSONObject;
-import org.json.JSONArray;
-
 import restservices.RestServices;
 
 import com.mendix.core.Core;
@@ -14,6 +11,8 @@ import com.mendix.systemwideinterfaces.core.meta.IMetaAssociation.AssociationTyp
 import com.mendix.systemwideinterfaces.core.meta.IMetaObject;
 import com.mendix.systemwideinterfaces.core.meta.IMetaPrimitive;
 import com.mendix.systemwideinterfaces.core.meta.IMetaPrimitive.PrimitiveType;
+import com.mendix.thirdparty.org.json.JSONObject;
+import com.mendix.thirdparty.org.json.JSONArray;
 
 public class JSONSchemaBuilder {
 
@@ -23,21 +22,21 @@ public class JSONSchemaBuilder {
 	private HashMap<String, String> typeMap;
 	private JSONObject definitions;
 	private boolean hasReferenceToRoot = false;
-	
+
 	private JSONSchemaBuilder(IMetaObject meta) {
 		this.baseObject = meta;
 	}
 
 	private JSONObject build() {
 		this.typeMap = new HashMap<String, String>();
-		
+
 		this.result = new JSONObject();
 		this.result.put("$schema", "http://json-schema.org/draft-04/schema#");
-		
+
 		this.definitions = new JSONObject();
-		
+
 		buildTypeDefinition(baseObject);
-		
+
 		if (hasReferenceToRoot)
 			this.result.put("$ref", "#/definitions/type1");
 		else {
@@ -46,32 +45,32 @@ public class JSONSchemaBuilder {
 				result.put(key, roottype.get(key));
 		}
 
-		//only add definitions if there are any types left. 
+		//only add definitions if there are any types left.
 		if (definitions.keys().hasNext())
 			this.result.put("definitions", definitions);
-		
+
 		return result;
 	}
-	
+
 	private void buildTypeDefinition(IMetaObject meta) {
 		if (typeMap.containsKey(meta.getName()))
-			return; 
-		
+			return;
+
 		typeMap.put(meta.getName(),  "type" + typeCounter);
 		JSONObject def = new JSONObject();
 		definitions.put("type" + typeCounter, def);
 		typeCounter += 1;
-		
+
 		def.put("type", "object");
 		JSONObject properties = new JSONObject();
 		def.put("properties", properties);
-		
+
 		for(IMetaPrimitive prim : meta.getMetaPrimitives()) {
 			JSONObject type = primitiveToJSONType(prim.getType());
 			if (type != null)
 				properties.put(prim.getName(), type);
 		}
-		
+
 		for(IMetaAssociation assoc : meta.getMetaAssociationsParent()) {
 			JSONObject type = associationToJSONType(assoc);
 			if (type != null)
@@ -81,9 +80,9 @@ public class JSONSchemaBuilder {
 
 	private JSONObject associationToJSONType(IMetaAssociation assoc) {
 		IMetaObject child = assoc.getChild();
-		
+
 		JSONObject type = null;
-		
+
 		//some kind of foreign key
 		if (child.isPersistable()) {
 			//only if there is a service available for that type;
@@ -93,7 +92,7 @@ public class JSONSchemaBuilder {
 					.put("title", String.format("Reference to a(n) '%s'", child.getName()));
 			}
 		}
-			
+
 		//persistent object, describe this object in the service as well
 		else {
 			buildTypeDefinition(child); //make sure the type is available in the schema
@@ -106,16 +105,16 @@ public class JSONSchemaBuilder {
 		//assoc should be included?
 		if (type == null)
 			return null;
-		
-		
+
+
 		//make sure referencesets require arrays
 		if (assoc.getType() == AssociationType.REFERENCESET)
 			type = new JSONObject().put("type", "array").put("items", type);
-		
+
 		//make sure null refs are supported
 		else /* not a refset */
 			type = orNull(type);
-		
+
 		return type;
 	}
 
@@ -125,7 +124,7 @@ public class JSONSchemaBuilder {
 		case AutoNumber:
 		case DateTime:
 		case Integer:
-		case Long:  
+		case Long:
 			return orNull(new JSONObject().put("type", "number").put("multipleOf", "1.0"));
 		case Binary:
 			return null;
@@ -139,23 +138,23 @@ public class JSONSchemaBuilder {
 		case HashString:
 		case String:
 		case Decimal:
-			return orNull(new JSONObject().put("type", "string")); 
+			return orNull(new JSONObject().put("type", "string"));
 		default:
 			throw new IllegalStateException("Unspported primitive type:  " + type);
 		}
 	}
-	
+
 	private static JSONObject orNull(JSONObject type) {
 		return new JSONObject().put("oneOf", new JSONArray()
 			.put(new JSONObject().put("type", "null"))
 			.put(type)
 		);
 	}
-		
+
 	public static JSONObject build(IMetaObject meta) {
 		return new JSONSchemaBuilder(meta).build();
 	}
-	
+
 	public static JSONObject build(IDataType type) {
 		if (type.isMendixObject())
 			return build(Core.getMetaObject(type.getObjectType()));

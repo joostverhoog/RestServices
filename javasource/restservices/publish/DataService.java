@@ -7,7 +7,6 @@ import java.util.Map.Entry;
 
 import org.apache.commons.httpclient.HttpStatus;
 import org.apache.commons.io.IOUtils;
-import org.json.JSONObject;
 
 import restservices.RestServices;
 import restservices.proxies.ChangeItem;
@@ -34,6 +33,7 @@ import com.mendix.systemwideinterfaces.core.IContext;
 import com.mendix.systemwideinterfaces.core.IMendixIdentifier;
 import com.mendix.systemwideinterfaces.core.IMendixObject;
 import com.mendix.systemwideinterfaces.core.meta.IMetaObject;
+import com.mendix.thirdparty.org.json.JSONObject;
 
 import communitycommons.XPath;
 import communitycommons.XPath.IBatchProcessor;
@@ -55,13 +55,13 @@ public class DataService {
 
 	public String getConstraint(IContext context) {
 		String constraint = def.getSourceConstraint() == null ? "" : def.getSourceConstraint();
-		
+
 		if (constraint.contains(RestServices.CURRENTUSER_TOKEN))
 			constraint = constraint.replace(RestServices.CURRENTUSER_TOKEN, "'" + context.getSession().getUser().getMendixObject().getId() + "'");
 
 		return constraint;
 	}
-	
+
 	private IMetaObject sourceMetaEntity;
 
 	private ChangeLogManager changeLogManager;
@@ -69,7 +69,7 @@ public class DataService {
 	private List<RestServiceHandler.HandlerRegistration> serviceHandlers = Lists.newArrayList();
 
 	private ICloseable metaServiceHandler;
-	
+
 	public ChangeLogManager getChangeLogManager() {
 		return changeLogManager;
 	}
@@ -81,7 +81,7 @@ public class DataService {
 	public String getSourceEntity() {
 		return def.getSourceEntity();
 	}
-	
+
 	public String getKeyAttribute() {
 		return def.getSourceKeyAttribute();
 	}
@@ -111,7 +111,7 @@ public class DataService {
 				.eq(ChangeItem.MemberNames.Key,key)
 				.eq(ChangeItem.MemberNames.ChangeItem_ChangeLog, getChangeLogManager().getChangeLog())
 				.first();
-	}	
+	}
 
 	public void serveCount(RestServiceRequest rsr) throws CoreException, RestPublishException {
 		if (!def.getEnableListing())
@@ -119,23 +119,23 @@ public class DataService {
 
 		rsr.startDoc();
 		rsr.datawriter.object();
-		
+
 		long count;
-		
+
 		if (def.getEnableChangeLog()) {
 			count = XPath.create(rsr.getContext(), ChangeItem.class)
 					.eq(ChangeItem.MemberNames.ChangeItem_ChangeLog, getChangeLogManager().getChangeLog())
 					.eq(ChangeItem.MemberNames.IsDeleted, false)
 					.count();
-		} else 
+		} else
 			count = Core.retrieveXPathQueryAggregate(rsr.getContext(), "count(//" + getSourceEntity() + getConstraint(rsr.getContext()) + ")");
-			
-		
+
+
 		rsr.datawriter.key("count").value(count).endObject();
 		rsr.endDoc();
 	}
 
-	
+
 	public void serveListing(RestServiceRequest rsr, boolean includeData, int offset, int limit) throws Exception {
 		if (!def.getEnableListing())
 			throw new RestPublishException(RestExceptionType.METHOD_NOT_ALLOWED, "List is not enabled for this service");
@@ -143,12 +143,12 @@ public class DataService {
 			throw new RestPublishException(RestExceptionType.BAD_REQUEST, "'offset' and 'limit' parameters should both be provided and positive, or none of them");
 		if (offset >= 0 && limit < 1)
 			throw new RestPublishException(RestExceptionType.BAD_REQUEST, "'limit' should be positive and larget than zero");
-		
+
 		rsr.startDoc();
-		
+
 		if (rsr.getResponseContentType() == ResponseType.HTML)
 			rsr.write("<h1>" + getRelativeUrl() + "</h1>");
-		
+
 		rsr.datawriter.array();
 
 		if (def.getEnableChangeLog())
@@ -159,7 +159,7 @@ public class DataService {
 		rsr.datawriter.endArray();
 		rsr.endDoc();
 	}
-	
+
 	private void serveListingFromIndex(final RestServiceRequest rsr,
 			final boolean includeData, int offset, int limit) throws CoreException {
 		XPath<ChangeItem> xp  = XPath.create(rsr.getContext(), ChangeItem.class)
@@ -167,12 +167,12 @@ public class DataService {
 			.eq(ChangeItem.MemberNames.IsDeleted, false)
 			.eq(ChangeItem.MemberNames._IsDirty, false)
 			.addSortingAsc(ChangeItem.MemberNames.Key);
-			
+
 		if (offset > -1)
 			xp.offset(offset); //MWE: note that the combination of offset/limit and batch only works in community commons 4.3.2 or higher!
 		if (limit > 0)
 			xp.limit(limit);
-		
+
 		xp.batch(RestServices.BATCHSIZE, new IBatchProcessor<ChangeItem>() {
 
 				@Override
@@ -189,80 +189,80 @@ public class DataService {
 	private void serveListingFromDB(RestServiceRequest rsr, boolean includeData, int baseoffset, int limit) throws Exception {
 		IRetrievalSchema schema = Core.createRetrievalSchema();
 		boolean hasOffset = baseoffset >= 0;
-		
+
 		if (!includeData) {
 			schema.addSortExpression(getKeyAttribute(), SortDirection.ASC);
 			schema.addMetaPrimitiveName(getKeyAttribute());
 		}
-		
+
 		int offset = hasOffset ? baseoffset : 0;
 
 		String xpath = "//" + getSourceEntity() + getConstraint(rsr.getContext());
 		List<IMendixObject> result = null;
-		
+
 		do {
 			int amount = hasOffset && limit > 0 ? Math.min(baseoffset + limit - offset, RestServices.BATCHSIZE) : RestServices.BATCHSIZE;
 			schema.setOffset(offset);
 			schema.setAmount(amount);
-			
+
 			result = !includeData
-					? Core.retrieveXPathQuery(rsr.getContext(), xpath, amount, offset, ImmutableMap.of(getKeyAttribute(), "ASC")) 
+					? Core.retrieveXPathQuery(rsr.getContext(), xpath, amount, offset, ImmutableMap.of(getKeyAttribute(), "ASC"))
 					: Core.retrieveXPathSchema(rsr.getContext(), xpath , schema, false);
-		
+
 			for(IMendixObject item : result) {
 				if (!includeData) {
 					if (!Utils.isValidKey(getKey(rsr.getContext(), item)))
 						continue;
-		
+
 					rsr.datawriter.value(getObjecturl(rsr.getContext(), item));
 				}
 				else {
 					rsr.datawriter.value(serializeToJson(rsr.getContext(), item));
 				}
 			}
-			
+
 			offset += result.size();
 		}
 		while(!result.isEmpty());
 	}
-	
+
 	public void serveGet(RestServiceRequest rsr, String key) throws Exception {
 		if (!def.getEnableGet())
 			throw new RestPublishException(RestExceptionType.METHOD_NOT_ALLOWED, "GET is not enabled for this service");
-		
+
 		if(def.getEnableChangeLog())
 			serveGetFromIndex(rsr, key);
 		else
 			serveGetFromDB(rsr, key);
 	}
 
-	
+
 	private void serveGetFromIndex(RestServiceRequest rsr, String key) throws Exception {
 		ChangeItem source = getObjectStateByKey(rsr.getContext(), key);
-		if (source == null || source.getIsDeleted() || source.get_IsDirty()) 
+		if (source == null || source.getIsDeleted() || source.get_IsDirty())
 			throw new RestPublishException(RestExceptionType.NOT_FOUND,	getRelativeUrl() + "/" + key);
-		
+
 		if (Utils.isNotEmpty(rsr.getETag()) && rsr.getETag().equals(source.getEtag())) {
 			rsr.setStatus(IMxRuntimeResponse.NOT_MODIFIED);
 			rsr.close();
 			return;
 		}
-		
+
 		writeGetResult(rsr,key, new JSONObject(source.getJson()), source.getEtag());
 	}
 
 	private void serveGetFromDB(RestServiceRequest rsr, String key) throws Exception {
 		IMendixObject source = getObjectByKey(rsr.getContext(), key);
-		if (source == null) 
+		if (source == null)
 			throw new RestPublishException(
 					keyExists(rsr.getContext(), key) && !isWorldReadable()? RestExceptionType.UNAUTHORIZED : RestExceptionType.NOT_FOUND,
 							getRelativeUrl() + "/" + key);
-		
+
 		JSONObject result = serializeToJson(rsr.getContext(), source);
-				
+
 		String jsonString = result.toString(4);
 		String eTag = Utils.getMD5Hash(jsonString);
-		
+
 		writeGetResult(rsr, key, result, eTag);
 	}
 
@@ -272,7 +272,7 @@ public class DataService {
 			rsr.close();
 			return;
 		}
-		
+
 		rsr.response.setHeader(RestServices.HEADER_ETAG, eTag);
 		rsr.startDoc();
 
@@ -282,63 +282,63 @@ public class DataService {
 		rsr.datawriter.value(result);
 		rsr.endDoc();
 	}
-	
+
 	public void serveDelete(RestServiceRequest rsr, String key, String etag) throws Exception {
 		if (!def.getEnableDelete())
 			throw new RestPublishException(RestExceptionType.METHOD_NOT_ALLOWED, "List is not enabled for this service");
 
 		IMendixObject source = getObjectByKey(rsr.getContext(), key);
-		
-		if (source == null) 
+
+		if (source == null)
 			throw new RestPublishException(keyExists(rsr.getContext(), key) && !isWorldReadable() ? RestExceptionType.UNAUTHORIZED : RestExceptionType.NOT_FOUND, getRelativeUrl() + "/" + key);
 
 		verifyEtag(rsr.getContext(), key, source, etag);
-		
+
 		if (Utils.isNotEmpty(def.getOnDeleteMicroflow()))
 			Core.execute(rsr.getContext(), def.getOnDeleteMicroflow(), source);
 		else
 			Core.delete(rsr.getContext(), source);
-		
+
 		rsr.setStatus(204); //no content
 		rsr.close();
 	}
-	
+
 	public void servePost(RestServiceRequest rsr, JSONObject data) throws Exception {
 		if (!def.getEnableCreate())
 			throw new RestPublishException(RestExceptionType.METHOD_NOT_ALLOWED, "Create (POST) is not enabled for this service");
 
 		IMendixObject target = Core.instantiate(rsr.getContext(), getSourceEntity());
-		
+
 		updateObject(rsr.getContext(), target, data);
-		
+
 		Object keyValue = target.getValue(rsr.getContext(), getKeyAttribute());
 		String key = keyValue == null ? null : String.valueOf(keyValue);
-		
+
 		if (!Utils.isValidKey(key))
 			throw new RuntimeException("Failed to serve POST request: microflow '" + def.getOnPublishMicroflow() + "' should have created a new key");
-			
+
 		rsr.setStatus(201); //created
-		
+
 		String eTag = getETag(rsr.getContext(), key, target);
 		if (eTag != null)
 			rsr.response.setHeader(RestServices.HEADER_ETAG, eTag);
 
 		rsr.datawriter.object().key(getKeyAttribute()).value(key).endObject();
-		
+
 		rsr.close();
 	}
 
 	public void servePut(RestServiceRequest rsr, String key, JSONObject data, String etag) throws Exception {
 
 		IContext context = rsr.getContext();
-		
+
 		IMendixObject target = getObjectByKey(context, key);
-		
+
 		if (!Utils.isValidKey(key))
 			rsr.setStatus(HttpStatus.SC_NOT_FOUND);
 		else if (target == null) {
 			if (keyExists(rsr.getContext(), key)){
-				//key exists, but this user cannot access it. 
+				//key exists, but this user cannot access it.
 				rsr.setStatus(HttpStatus.SC_FORBIDDEN);
 				rsr.close();
 				return;
@@ -346,7 +346,7 @@ public class DataService {
 
 			if (!def.getEnableCreate())
 				throw new RestPublishException(RestExceptionType.METHOD_NOT_ALLOWED, "Create (PUT) is not enabled for this service");
-			
+
 			target = Core.instantiate(context, getSourceEntity());
 			target.setValue(context, getKeyAttribute(), key);
 			rsr.setStatus(HttpStatus.SC_CREATED);
@@ -355,36 +355,36 @@ public class DataService {
 			//already existing target
 			if (!def.getEnableUpdate())
 				throw new RestPublishException(RestExceptionType.METHOD_NOT_ALLOWED, "Update (PUT) is not enabled for this service");
-			
+
 			verifyEtag(rsr.getContext(), key, target, etag);
 			rsr.setStatus(204);
 		}
-		
+
 		updateObject(rsr.getContext(), target, data);
-		
+
 		String eTag = getETag(rsr.getContext(), key, target);
 		if (eTag != null)
 			rsr.response.setHeader(RestServices.HEADER_ETAG, eTag);
-		
+
 		rsr.close();
 	}
-	
+
 	private boolean keyExists(IContext context, String key) throws CoreException {
-		return getObjectByKey(context.isSudo() ? context : context.createSudoClone(), key) != null; 
+		return getObjectByKey(context.isSudo() ? context : context.createSudoClone(), key) != null;
 	}
-	
+
 	/**
-	 * Returns an array with [viewArgName, viewArgType, targetArgName]. 
-	 * TargetARgType is the sourceEntity of this microflow. 
+	 * Returns an array with [viewArgName, viewArgType, targetArgName].
+	 * TargetARgType is the sourceEntity of this microflow.
 	 * Or throws an exception if the microflow does not supplies these argements
 	 * @return
 	 */
 	static String[] extractArgInfoForUpdateMicroflow(DataServiceDefinition serviceDef) {
 		Map<String, String> argtypes = Utils.getArgumentTypes(serviceDef.getOnUpdateMicroflow());
-		
+
 		if (argtypes.size() != 2)
 			throw new RuntimeException("Expected exactly two arguments for microflow " + serviceDef.getOnUpdateMicroflow());
-		
+
 		//Determine argnames
 		String viewArgName = null;
 		String targetArgName = null;
@@ -397,7 +397,7 @@ public class DataService {
 				viewArgType = e.getValue();
 			}
 		}
-		
+
 		if (targetArgName == null || viewArgName == null || Core.getMetaObject(viewArgType).isPersistable())
 			throw new RuntimeException("Microflow '" + serviceDef.getOnUpdateMicroflow() + "' should have one argument of type " + serviceDef.getSourceEntity() + ", and one argument typed with an persistent entity");
 
@@ -406,13 +406,13 @@ public class DataService {
 
 	private void updateObject(IContext context, IMendixObject target,
 			JSONObject data) throws Exception, Exception {
-		
+
 		String[] argInfo = extractArgInfoForUpdateMicroflow(def);
-		
+
 		IMendixObject view = Core.instantiate(context, argInfo[1]);
 		JsonDeserializer.readJsonDataIntoMendixObject(context, data, view, false);
 		Core.commit(context, view);
-		
+
 		Core.execute(context, def.getOnUpdateMicroflow(), ImmutableMap.of(argInfo[2], (Object) target, argInfo[0], (Object) view));
 	}
 
@@ -421,7 +421,7 @@ public class DataService {
 			return;
 
 		String currentETag = getETag(context, key, source);
-		
+
 		if (currentETag == null || !currentETag.equals(etag))
 			throw new RestPublishException(RestExceptionType.CONFLICTED, "Update conflict detected, expected change based on version '" + currentETag + "', but found '" + etag + "'");
 	}
@@ -430,13 +430,13 @@ public class DataService {
 			throws CoreException, Exception, UnsupportedEncodingException {
 		String currentETag = null;
 		if (def.getEnableChangeLog()) {
-			ChangeItem objectState = getObjectStateByKey(context, key); 
+			ChangeItem objectState = getObjectStateByKey(context, key);
 			if (objectState != null)
 				currentETag = objectState.getEtag();
 		}
 		else {
 			JSONObject result = serializeToJson(context, source);
-				
+
 			String jsonString = result.toString(4);
 			currentETag = Utils.getMD5Hash(jsonString);
 		}
@@ -448,14 +448,14 @@ public class DataService {
 			this.sourceMetaEntity = Core.getMetaObject(getSourceEntity());
 		return this.sourceMetaEntity;
 	}
-	
+
 	public IMendixObject convertSourceToView(IContext context, IMendixObject source) throws CoreException {
 		IMendixObject res = (IMendixObject) Core.execute(context, def.getOnPublishMicroflow(), source);
 		if (res == null)
 			throw new IllegalStateException("Exception during serialization: " + def.getOnPublishMicroflow() + " microflow didn't return an object");
 		return res;
 	}
-	
+
 	JSONObject serializeToJson(final IContext context, IMendixObject source) throws CoreException, Exception {
 		IMendixObject view = convertSourceToView(context, source);
 		return JsonSerializer.writeMendixObjectToJson(context, view, true);
@@ -494,13 +494,13 @@ public class DataService {
 
 	public void register() {
 		unregister();
-		
-		if (def.getEnableGet()) 
+
+		if (def.getEnableGet())
 			RestServices.registerServiceByEntity(def.getSourceEntity(), this);
-		
+
 		servicesByGuid.put(def.getMendixObject().getId().toLong(), this);
 		metaServiceHandler = RestServiceHandler.registerServiceHandlerMetaUrl(getRelativeUrl());
-		
+
 		registerHandlers();
 	}
 
@@ -542,7 +542,7 @@ public class DataService {
 							Integer.valueOf(rsr.getRequestParameter(RestServices.PARAM_LIMIT, "-1")));
 			}
 		}));
-		
+
 		// Create object
 		serviceHandlers.add(RestServiceHandler.registerServiceHandler(HttpMethod.POST, base, getRequiredRoleOrMicroflow(), new IRestServiceHandler() {
 
@@ -561,7 +561,7 @@ public class DataService {
 				servePost(rsr, data);
 			}
 		}));
-		
+
 		// Get Object
 		serviceHandlers.add(RestServiceHandler.registerServiceHandler(HttpMethod.GET, baseWithKey, getRequiredRoleOrMicroflow(), new IRestServiceHandler() {
 
@@ -571,7 +571,7 @@ public class DataService {
 				serveGet(rsr, params.get(getKeyAttribute()));
 			}
 		}));
-		
+
 		// Update Object
 		serviceHandlers.add(RestServiceHandler.registerServiceHandler(HttpMethod.PUT, baseWithKey, getRequiredRoleOrMicroflow(), new IRestServiceHandler() {
 
@@ -582,17 +582,17 @@ public class DataService {
 				servePut(rsr, params.get(getKeyAttribute()), new JSONObject(body), rsr.getETag());
 			}
 		}));
-		
+
 		// Delete Object
 		serviceHandlers.add(RestServiceHandler.registerServiceHandler(HttpMethod.DELETE, baseWithKey, getRequiredRoleOrMicroflow(), new IRestServiceHandler() {
 
 			@Override
 			public void execute(RestServiceRequest rsr,
 					Map<String, String> params) throws Exception {
-				serveDelete(rsr, params.get(getKeyAttribute()), rsr.getETag());				
+				serveDelete(rsr, params.get(getKeyAttribute()), rsr.getETag());
 			}
 		}));
-		
+
 		// Changes list
 		serviceHandlers.add(RestServiceHandler.registerServiceHandler(HttpMethod.GET, base + "changes/list", getRequiredRoleOrMicroflow(), new IRestServiceHandler() {
 
@@ -609,7 +609,7 @@ public class DataService {
 			@Override
 			public void execute(RestServiceRequest rsr,
 					Map<String, String> params) throws Exception {
-				getChangeLogManager().serveChanges(rsr, true);				
+				getChangeLogManager().serveChanges(rsr, true);
 			}
 		}));
 	}

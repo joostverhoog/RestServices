@@ -5,8 +5,8 @@ import static org.junit.Assert.assertEquals;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
+import com.mendix.thirdparty.org.json.JSONArray;
+import com.mendix.thirdparty.org.json.JSONObject;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -31,10 +31,10 @@ public class BasicTests extends TestBase {
 		IContext c = Core.createSystemContext();
 		Task t = createTask(c, "Fetch milk", false);
 		publishTask(c, t, false);
-		
+
 		IContext c2 = Core.createSystemContext();
 		CTaskView v;
-		
+
 		//get
 		v = getTask(c2, t.getNr().toString(), null, ResponseCode.OK, 200);
 		Assert.assertEquals("Fetch milk", v.getDescription());
@@ -69,28 +69,28 @@ public class BasicTests extends TestBase {
 		catch(RestConsumeException e) {
 			Assert.assertEquals(404L, e.getStatus());
 		}
-		
+
 		//use invalid key, should return 404
 		try {
 			v = getTask(c2, "iamnotanumber", null, ResponseCode.OK, 200);
 			Assert.fail();
 		}
-		catch(RestConsumeException e) { 
+		catch(RestConsumeException e) {
 			Assert.assertEquals(404L, e.getStatus());
 		}
-		
+
 		//use other contentType, should work but not set data
 		RequestResult xmlresult = RestConsumer.getObject(c, baseUrl + t.getNr().toString() + "?contenttype=xml", null);
-		
+
 		Assert.assertEquals(200L, (long)(int)xmlresult.getRawResponseCode());
 		Assert.assertTrue(xmlresult.getResponseBody().startsWith("<?xml"));
 		Assert.assertTrue(xmlresult.getResponseBody().contains("milk"));
-		
+
 		//disble the service
 		def.setEnableGet(false);
 		def.setEnableListing(false);
 		def.commit();
-		
+
 		try {
 			v = getTask(c2, v.getNr().toString(), null, ResponseCode.OK, 200);
 			Assert.fail();
@@ -98,46 +98,46 @@ public class BasicTests extends TestBase {
 		catch(RestConsumeException e) {
 			Assert.assertEquals(405L, e.getStatus()); //Method  not allowed
 		}
-		
+
 		//enable, set constraint, find
 		def.setEnableGet(true);
 		def.setEnableListing(true);
 		def.setSourceConstraint("[" + Task.MemberNames.Completed.toString() + " = false()]");
 		def.commit();
-		
+
 		v = getTask(c2, t.getNr().toString(), null, ResponseCode.OK, 200);
 		Assert.assertEquals("Fetch milk", v.getDescription());
 		Assert.assertEquals(t.getNr(), v.getNr());
 		Assert.assertEquals(false, v.getCompleted());
-		
+
 		//make task no longer match constraint
 		t.setCompleted(true);
 		publishTask(c,t,false);
-		
+
 		try {
 			v = getTask(c2, t.getNr().toString(), null, ResponseCode.OK, 200);
 			Assert.fail();
 		}
-		catch(RestConsumeException e) { 
+		catch(RestConsumeException e) {
 			Assert.assertEquals(404L, e.getStatus());
 		}
-		
+
 		t.setCompleted(false);
 		publishTask(c2, t, false);
-		
+
 		//enable but secure the service
 		def.setAccessRole("User");
 		def.setSourceConstraint("");
 		def.commit();
-		
+
 		try {
 			v = getTask(c2, v.getNr().toString(), null, ResponseCode.OK, 200);
 			Assert.fail();
 		}
-		catch(RestConsumeException e) { 
+		catch(RestConsumeException e) {
 			Assert.assertEquals(401L, e.getStatus());
 		}
-		
+
 		//secure, use valid user
 		RestConsumer.addCredentialsToNextRequest(getTestUser(), "Password1!");
 
@@ -146,7 +146,7 @@ public class BasicTests extends TestBase {
 		Assert.assertEquals(t.getNr(), v.getNr());
 		Assert.assertEquals(false, v.getCompleted());
 		Assert.assertTrue(lastRequestResult.getResponseBody().contains("milk"));
-		
+
 		//secure, but does not match constraint
 		def.setSourceConstraint("[" + Task.MemberNames.Completed.toString() + " = false()]");
 		def.commit();
@@ -157,48 +157,48 @@ public class BasicTests extends TestBase {
 			v = getTask(c2, t.getNr().toString(), null, ResponseCode.OK, 200);
 			Assert.fail();
 		}
-		catch(RestConsumeException e) { 
+		catch(RestConsumeException e) {
 			Assert.assertEquals(401L, e.getStatus());
 		}
-		
+
 		//unsecure, and delete
 		def.setAccessRole("*");
 		def.commit();
-		
+
 		t.delete();
 		publishTask(c, t, true);
-		
+
 		try {
 			v = getTask(c2, t.getNr().toString(), null, ResponseCode.OK, 200);
 			Assert.fail();
 		}
-		catch(RestConsumeException e) { 
+		catch(RestConsumeException e) {
 			Assert.assertEquals(404L, e.getStatus());
 		}
 	}
-	
+
 	@Test
 	public void simpleList() throws Exception {
 		//count
 		IContext c = Core.createSystemContext();
 		JSONObject d = new JSONObject(RestConsumer.request(c, HttpMethod.GET, baseUrl +"?count", null, null, false).getResponseBody());
 		Assert.assertEquals(0, d.getInt("count"));
-				
-		
+
+
 		Task t1 = createTask(c, "Fetch milk", false);
 		Task t2 = createTask(c, "Give it to the cat", true);
 		Task t3 = createTask(c, "Make coffee", false);
-		
+
 		publishTask(c, t1, false);
 		publishTask(c, t2, false);
 		publishTask(c, t3, false);
-		
+
 		IContext c2 = Core.createSystemContext();
-		
+
 		//count
 		d = new JSONObject(RestConsumer.request(c, HttpMethod.GET, baseUrl +"?count", null, null, false).getResponseBody());
 		Assert.assertEquals(3, d.getInt("count"));
-		
+
 		//Test difference between include data and not include data
 		JSONArray ar = new JSONArray(RestConsumer.request(c, HttpMethod.GET, baseUrl, null, null, false).getResponseBody());
 		Assert.assertEquals(3, ar.length());
@@ -213,31 +213,31 @@ public class BasicTests extends TestBase {
 		Assert.assertEquals(ar.get(2) instanceof JSONObject, true);
 
 		//Peform a get on the list
-		
+
 		List<IMendixObject> tasks = new ArrayList<IMendixObject>();
 		IMendixObject firstResult = new CTaskView(c2).getMendixObject();
-		
+
 		tasks.clear();
 		RestConsumer.getCollection(c2, baseUrl, tasks, firstResult);
-		
+
 		Assert.assertEquals(tasks.size(), 3);
 		Assert.assertEquals(CTaskView.initialize(c2, tasks.get(0)).getDescription(), "Fetch milk");
 		Assert.assertEquals(CTaskView.initialize(c2, tasks.get(1)).getDescription(), "Give it to the cat");
 		Assert.assertEquals(CTaskView.initialize(c2, tasks.get(2)).getDescription(), "Make coffee");
-		
+
 		//perform a get + data
 		tasks.clear();
 		RestConsumer.getCollection(c2, baseUrl + "?data=true", tasks, firstResult);
-		
+
 		Assert.assertEquals(tasks.size(), 3);
 		Assert.assertEquals(CTaskView.initialize(c2, tasks.get(0)).getDescription(), "Fetch milk");
 		Assert.assertEquals(CTaskView.initialize(c2, tasks.get(1)).getDescription(), "Give it to the cat");
 		Assert.assertEquals(CTaskView.initialize(c2, tasks.get(2)).getDescription(), "Make coffee");
-		
+
 		//disable service
 		def.setEnableListing(false);
 		def.commit();
-		
+
 		try {
 			tasks.clear();
 			RestConsumer.getCollection(c2, baseUrl, tasks, firstResult);
@@ -246,29 +246,29 @@ public class BasicTests extends TestBase {
 		catch(RestConsumeException e) {
 			Assert.assertEquals(405L, e.getStatus()); //Method  not allowed
 		}
-		
+
 		//enable, set constraint, find
 		def.setEnableGet(true);
 		def.setEnableListing(true);
 		def.setSourceConstraint("[" + Task.MemberNames.Completed.toString() + " = false()]");
 		def.commit();
-		
+
 		//count
 		d = new JSONObject(RestConsumer.request(c, HttpMethod.GET, baseUrl +"?count", null, null, false).getResponseBody());
 		Assert.assertEquals(d.getInt("count"), 2);
-		
+
 		//check results
 		tasks.clear();
 		RestConsumer.getCollection(c2, baseUrl, tasks, firstResult);
-		
+
 		Assert.assertEquals(tasks.size(), 2);
 		Assert.assertEquals(CTaskView.initialize(c2, tasks.get(0)).getDescription(), "Fetch milk");
 		Assert.assertEquals(CTaskView.initialize(c2, tasks.get(1)).getDescription(), "Make coffee");
-		
+
 		//perform a get + data
 		tasks.clear();
 		RestConsumer.getCollection(c2, baseUrl + "?data=true", tasks, firstResult);
-		
+
 		Assert.assertEquals(tasks.size(), 2);
 		Assert.assertEquals(CTaskView.initialize(c2, tasks.get(0)).getDescription(), "Fetch milk");
 		Assert.assertEquals(CTaskView.initialize(c2, tasks.get(1)).getDescription(), "Make coffee");
@@ -303,18 +303,18 @@ public class BasicTests extends TestBase {
 		tasks.clear();
 		t1.delete();
 		publishTask(c, t1, true);
-		
+
 		RestConsumer.getCollection(c2, baseUrl, tasks, firstResult);
 		Assert.assertEquals(1, tasks.size());
 		Assert.assertEquals(CTaskView.initialize(c2, tasks.get(0)).getDescription(), "Make coffee");
-		
+
 	}
-	
+
 	@Test
 	public void getFromIndex() throws Exception {
 		def.setEnableChangeLog(true);
 		def.commit();
-		
+
 		simpleGet();
 
 	}
@@ -324,17 +324,17 @@ public class BasicTests extends TestBase {
 		def.setEnableChangeLog(true);
 		def.setSourceConstraint("");
 		def.commit();
-		
+
 		simpleList();
 	}
-	
+
 	@Test
 	public void listWithSmallBatchsize() throws Exception {
 		int bs = RestServices.BATCHSIZE;
-		
+
 		try {
 			RestServices.BATCHSIZE = 2;
-			
+
 			simpleList();
 
 			tearDown();
@@ -345,9 +345,9 @@ public class BasicTests extends TestBase {
 			tearDown();
 			setup();
 			RestServices.BATCHSIZE = 1;
-			
+
 			simpleList();
-			
+
 			tearDown();
 			setup();
 			listFromIndex();
@@ -368,54 +368,54 @@ public class BasicTests extends TestBase {
 		def.setEnableGet(true);
 		def.setEnableListing(true);
 		def.commit();
-		
+
 		String key = "http://www.nu.nl/bla?q=3&param=value;  !@#$%^&*()_-+={}|[]\"\\:;\'<>?,./~`\n\r\t\b\fENDOFKEY";
 		String enc = Utils.urlEncode(key);
-		
+
 		CTaskView t = new CTaskView(c);
 		t.setDescription(key);
-		
+
 		RestConsumer.postObject(c, baseUrl, t.getMendixObject(), t.getMendixObject());
-		
+
 		Assert.assertEquals(key, t.getDescription());
 		//GET with wrong key
 		//assertErrorcode(c, HttpMethod.GET, baseUrl + key, 404);
-		
+
 		//GET with correct key
 		CTaskView copy = new CTaskView(c);
 		RestConsumer.getObject(c, baseUrl + enc, copy.getMendixObject());
 		Assert.assertEquals(key, copy.getDescription());
-		
+
 		//LIST
 		JSONArray ar = new JSONArray(RestConsumer.request(c, HttpMethod.GET, baseUrl, null, null, false).getResponseBody());
 		Assert.assertEquals(1, ar.length());
 		Assert.assertEquals(baseUrl + enc, ar.getString(0));
-		
+
 		//PUT
 		t.setCompleted(true);
 		RestConsumer.putObject(c, baseUrl + enc, t.getMendixObject(), null);
-		
+
 		RestConsumer.getObject(c, baseUrl + enc, copy.getMendixObject());
 		Assert.assertEquals(true, copy.getCompleted());
 		Assert.assertEquals(key, copy.getDescription());
-		
+
 		//count, there should still be one
 		ar = new JSONArray(RestConsumer.request(c, HttpMethod.GET, baseUrl, null, null, false).getResponseBody());
 		Assert.assertEquals(1, ar.length());
-		
+
 		//DELETE
 		RestConsumer.deleteObject(c, baseUrl + enc, null);
-		
+
 		//count
 		ar = new JSONArray(RestConsumer.request(c, HttpMethod.GET, baseUrl, null, null, false).getResponseBody());
 		Assert.assertEquals(0, ar.length());
 	}
 
-	@Test 
+	@Test
 	public void nullStringTest() throws Exception{
 		IContext c = Core.createSystemContext();
 		IContext c2 = Core.createSystemContext();
-		
+
 		def.setSourceKeyAttribute("Nr");
 		def.setUseStrictVersioning(false);
 		def.setEnableCreate(true);
@@ -424,25 +424,25 @@ public class BasicTests extends TestBase {
 		def.setEnableGet(true);
 		def.setEnableListing(true);
 		def.commit();
-		
+
 		Task t = new Task(c);
 		t.setDescription("bla");
 		t.commit();
-		
+
 		CTaskView copy = new CTaskView(c2);
 		RestConsumer.getObject(c2, baseUrl + t.getNr(), copy.getMendixObject());
 		Assert.assertEquals("bla", copy.getDescription());
-		
+
 		copy.setDescription(null);
 		RestConsumer.putObject(c2, baseUrl + t.getNr(), copy.getMendixObject(), null);
-		
+
 		copy = new CTaskView(c2);
-		
+
 		RestConsumer.getObject(c2, baseUrl + t.getNr(), copy.getMendixObject());
 		Assert.assertEquals(null, copy.getDescription());
-		
+
 	}
-	
+
 	/*
 	 * GitHub issue #22
 	 */
@@ -463,7 +463,7 @@ public class BasicTests extends TestBase {
 		def.setEnableGet(true);
 		def.setEnableListing(true);
 		def.commit();
-	
+
 		Task t = new Task(serverContext);
 		t.setDescription(description);
 		t.commit();
@@ -472,10 +472,10 @@ public class BasicTests extends TestBase {
 		RestConsumer.getObject(clientContext, RestServices.getBaseUrl() + serviceName + '/' + t.getNr(), copy.getMendixObject());
 
 		assertEquals(description, copy.getDescription());
-		
+
 		RequestResult response = RestConsumer.getObject(clientContext, RestServices.getBaseUrl() + serviceName + "?about", null);
 		assertEquals(200, (int) response.getRawResponseCode());
-		
+
 		//valid JSON?
 		new JSONObject(response.getResponseBody());
 	}

@@ -19,8 +19,6 @@ import org.apache.commons.httpclient.HttpStatus;
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 import restservices.RestServices;
 import restservices.consume.RestConsumeException;
@@ -43,13 +41,15 @@ import com.mendix.m2ee.api.IMxRuntimeRequest;
 import com.mendix.m2ee.api.IMxRuntimeResponse;
 import com.mendix.systemwideinterfaces.core.IContext;
 import com.mendix.systemwideinterfaces.core.ISession;
+import com.mendix.thirdparty.org.json.JSONException;
+import com.mendix.thirdparty.org.json.JSONObject;
 import communitycommons.XPath;
 
 public class RestServiceHandler extends RequestHandler{
 
 	private static RestServiceHandler instance = null;
 	private static boolean started = false;
-	
+
 	static class HandlerRegistration implements ICloseable {
 		final String method;
 		final UriTemplate template;
@@ -62,7 +62,7 @@ public class RestServiceHandler extends RequestHandler{
 			this.roleOrMicroflow = roleOrMicroflow;
 			this.handler = handler;
 		}
-		
+
 		@Override
 		public String toString() {
 			return ReflectionToStringBuilder.toString(this, ToStringStyle.SHORT_PREFIX_STYLE);
@@ -70,33 +70,33 @@ public class RestServiceHandler extends RequestHandler{
 
 		@Override
 		public void close() {
-			services.remove(this);			
+			services.remove(this);
 		}
 	}
-	
+
 	private static List<HandlerRegistration> services = newCopyOnWriteArrayList();
 	private static List<String> metaServiceUrls = newCopyOnWriteArrayList();
 
 	static {
 		registerServiceOverviewHandler();
 	}
-	
+
 	public synchronized static void start(IContext context) throws Exception {
 		if (instance == null) {
 			RestServices.LOGPUBLISH.info("Starting RestServices module...");
 
 			instance = new RestServiceHandler();
-			
+
 			boolean isSandbox = Core.getConfiguration().getApplicationRootUrl().contains(".mendixcloud.com") && Core.getConfiguration().isInDevelopment();
 			if (isSandbox)
 				startSandboxCompatibilityMode();
 			else
 				Core.addRequestHandler(RestServices.PATH_REST, instance);
-			
+
 			started = true;
 
 			loadConfig(context);
-			
+
 			RestServices.LOGPUBLISH.info("Starting RestServices module... DONE");
 		}
 	}
@@ -105,12 +105,12 @@ public class RestServiceHandler extends RequestHandler{
 	 * startSandboxCompatibilityMode is introduced to circumvent the fact that custom request handlers
 	 * are not available in sandbox apps. In that case the 'ws-doc' requesthandler is reclaimed by the
 	 * Rest services module as soon the app is started. Obviously this is a nasty workaround and this
-	 * should only be used for demo / testing purposes but never be exposed in real live apps. 
+	 * should only be used for demo / testing purposes but never be exposed in real live apps.
 	 */
 	private static void startSandboxCompatibilityMode() {
 		RestServices.PATH_REST = "ws-doc/";
 		final RestServiceHandler self = instance;
-		
+
 		new Thread() {
 			@Override
 			public void run() {
@@ -127,7 +127,7 @@ public class RestServiceHandler extends RequestHandler{
 						RestServices.LOGPUBLISH.warn("Error when trying to start sandbox mode: " + e.getMessage(), e);
 						break;
 					}
-				} 
+				}
 				Core.addRequestHandler(RestServices.PATH_REST, self);
 				RestServices.LOGPUBLISH.warn("The RestServices module has been started on basepath 'ws-doc/' for sandbox compatibility. Please use the alternative basepath for demo & testing purposes only, and do not share this path as integration endpoint");
 			}
@@ -140,9 +140,9 @@ public class RestServiceHandler extends RequestHandler{
 			@Override
 			public void execute(RestServiceRequest rsr,
 					Map<String, String> params) throws Exception {
-				ServiceDescriber.serveServiceOverview(rsr); 
+				ServiceDescriber.serveServiceOverview(rsr);
 			}
-			
+
 		});
 	}
 
@@ -176,33 +176,33 @@ public class RestServiceHandler extends RequestHandler{
 			if (service != null) {
 				service.unregister();
 			}
-			
+
 			RestServices.LOGPUBLISH.info("Reloading definition of service '" + def.getName() + "'");
 			service = new DataService(def);
 			service.register();
-			
+
 			RestServices.LOGPUBLISH.info("Loading service " + def.getName()+ "... DONE");
 		}
 	}
-	
+
 	public static HandlerRegistration registerServiceHandler(HttpMethod method, String templatePath, String roleOrMicroflow, IRestServiceHandler handler) {
 		checkNotNull(method, "method");
-		
+
 		HandlerRegistration handlerRegistration = new HandlerRegistration(method.toString(), new UriTemplate(templatePath), roleOrMicroflow, handler);
 		services.add(handlerRegistration);
 
 		RestServices.LOGPUBLISH.info("Registered data service on '" + method + " " + templatePath + "'");
 		return handlerRegistration;
 	}
-	
+
 	private static void requestParamsToJsonMap(RestServiceRequest rsr, Map<String, String> params) {
 		for (String param : rsr.request.getParameterMap().keySet())
 			params.put(param, rsr.request.getParameter(param));
 	}
-	
+
 	public static void paramMapToJsonObject(Map<String, String> params, JSONObject data) {
 		for(Entry<String, String> pathValue : params.entrySet())
-			data.put(pathValue.getKey(), pathValue.getValue());		
+			data.put(pathValue.getKey(), pathValue.getValue());
 	}
 
 	private static void executeHandler(final RestServiceRequest rsr, String method, String relpath, ISession existingSession) throws Exception {
@@ -250,7 +250,7 @@ public class RestServiceHandler extends RequestHandler{
 			String _) {
 
 		long start = System.currentTimeMillis();
-		
+
 		HttpServletRequest request = req.getHttpServletRequest();
 		HttpServletResponse response = resp.getHttpServletResponse();
 
@@ -274,9 +274,9 @@ public class RestServiceHandler extends RequestHandler{
 		RestServiceRequest rsr = new RestServiceRequest(request, response, resp, relpath);
 		try {
 			ISession existingSession = getSessionFromRequest(req);
-			
+
 			executeHandler(rsr, method, relpath, existingSession);
-			
+
 			if (RestServices.LOGPUBLISH.isDebugEnabled())
 					RestServices.LOGPUBLISH.debug("Served " + requestStr + " in " + (System.currentTimeMillis() - start) + "ms.");
 		}
@@ -361,14 +361,14 @@ public class RestServiceHandler extends RequestHandler{
 	}
 
 	public static void clearServices() {
-		services.clear();	
+		services.clear();
 		registerServiceOverviewHandler();
 	}
 
 	public static ICloseable registerServiceHandlerMetaUrl(final String serviceBaseUrl) {
 		checkArgument(isNotEmpty(serviceBaseUrl));
 		metaServiceUrls.add(serviceBaseUrl);
-		
+
 		return new ICloseable() {
 
 			@Override
@@ -377,9 +377,9 @@ public class RestServiceHandler extends RequestHandler{
 			}
 		};
 	}
-	
+
 	public static List<String> getServiceBaseUrls() {
-		return metaServiceUrls; 
+		return metaServiceUrls;
 	}
-	
+
 }

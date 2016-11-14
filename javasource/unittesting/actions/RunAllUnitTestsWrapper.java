@@ -18,10 +18,7 @@ import com.mendix.systemwideinterfaces.core.IFeedback.MessageType;
 import com.mendix.systemwideinterfaces.core.IMendixObject;
 import com.mendix.webui.CustomJavaAction;
 
-/**
- * 
- */
-public class RunAllUnitTestsWrapper extends CustomJavaAction<Boolean>
+public class RunAllUnitTestsWrapper extends CustomJavaAction<java.lang.Boolean>
 {
 	private IMendixObject __testRun;
 	private unittesting.proxies.TestSuite testRun;
@@ -33,7 +30,7 @@ public class RunAllUnitTestsWrapper extends CustomJavaAction<Boolean>
 	}
 
 	@Override
-	public Boolean executeAction() throws Exception
+	public java.lang.Boolean executeAction() throws Exception
 	{
 		this.testRun = __testRun == null ? null : unittesting.proxies.TestSuite.initialize(getContext(), __testRun);
 
@@ -53,7 +50,7 @@ public class RunAllUnitTestsWrapper extends CustomJavaAction<Boolean>
 	 * Returns a string representation of this action
 	 */
 	@Override
-	public String toString()
+	public java.lang.String toString()
 	{
 		return "RunAllUnitTestsWrapper";
 	}

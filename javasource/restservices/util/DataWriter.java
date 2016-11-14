@@ -4,8 +4,9 @@ import java.io.OutputStream;
 import java.util.Stack;
 
 import org.apache.commons.lang3.StringEscapeUtils;
-import org.json.JSONArray;
-import org.json.JSONObject;
+
+import com.mendix.thirdparty.org.json.JSONObject;
+import com.mendix.thirdparty.org.json.JSONArray;
 
 import restservices.RestServices;
 
@@ -23,51 +24,51 @@ public class DataWriter {
 		boolean isListItem = false;
 		String key = null;
 	}
-	
+
 	public static final int JSON = 0;
 	public static final int XML = 1;
 	public static final int HTML = 2;
-	
+
 	private int mode;
 	private Stack<State> states = new Stack<State>();
 	private OutputStream writer;
-	
+
 	public DataWriter(OutputStream writer, int mode) {
 		this.mode = mode;
 		this.writer = writer;
 		states.push(new State()); //root state to avoid NPE's
 	}
-	
+
 	public DataWriter array() {
 		writeValueStart();
 		states.push(new State());
 		state().isArray = true;
-		
+
 		if (mode == JSON)
 			write("[");
 		else if (mode == HTML)
 			write("<ol>");
-		
+
 		return this;
 	}
-	
+
 	public DataWriter endArray() {
 		writeValueEnd();
-		
+
 		assrt(state().isArray, "unexpected endArray");
-		
+
 		if (mode == JSON)
 			write("]");
 		else if (mode == HTML)
 			write("</ol>");
-		
+
 		states.pop();
 		return this;
 	}
-	
+
 	public DataWriter object() {
 		writeValueStart();
-		
+
 		states.push(new State());
 		state().isObject = true;
 
@@ -75,14 +76,14 @@ public class DataWriter {
 			write("{");
 		else if (mode == HTML)
 			write("\n<table class=\"table-nested-").write(states.size() % 4 == 0 ? "even" : "odd").write("\">");
-		
+
 		return this;
 	}
-	
+
 	public DataWriter endObject() {
 		writeValueEnd();
 		assrt(state().isObject, "unexpected endArray");
-		
+
 		if (mode == JSON)
 			write("}");
 		else if (mode == HTML)
@@ -95,25 +96,25 @@ public class DataWriter {
 
 	public DataWriter key(String keyName) {
 		writeValueEnd();
-		
+
 		assrt(state().isObject, "Key can only be used in state 'beginObject'");
 		writeValueStart();
-		
+
 		State s = new State();
 		s.isKey = true;
 		s.key = mode == XML ? keyName.replaceAll("[^a-zA-Z0-9_]", "_") : keyName;
 		states.push(s);
-		
+
 		if (mode == JSON)
 			write(JSONObject.quote(s.key)).write(":");
 		else if (mode == XML)
 			write("<").write(s.key).write(">");
 		else if (mode == HTML)
 			write("\n<tr><td>").write(StringEscapeUtils.escapeHtml4(s.key)).write("</td><td>");
-		
+
 		return this;
 	}
-	
+
 	public DataWriter value(Object value) {
 		if (value == null || value == JSONObject.NULL)
 			writeString(null);
@@ -137,7 +138,7 @@ public class DataWriter {
 			assrt(false, "Expected String, Number, JSONObject or JSONArray");
 		return this;
 	}
-	
+
 	private DataWriter writeString(String value) {
 		writeValueStart();
 
@@ -147,7 +148,7 @@ public class DataWriter {
 			else if (mode == HTML)
 				write("<p class='null'>&lt;none&gt;</p>");
 		}
-		
+
 		else {
 			if (mode == JSON)
 				write(JSONObject.valueToString(value));
@@ -155,12 +156,12 @@ public class DataWriter {
 				write(StringEscapeUtils.escapeXml(value));
 			else if (mode == HTML)
 				write(Utils.autoGenerateLink(StringEscapeUtils.escapeHtml4(value)));
-		}	
-		
+		}
+
 		writeValueEnd();
 		return this;
 	}
-	
+
 	public DataWriter value(long value) {
 		return value(Long.toString(value));
 	}
@@ -168,15 +169,15 @@ public class DataWriter {
 	public DataWriter value(double value) {
 		return value(Double.toString(value));
 	}
-	
+
 	public DataWriter writeNull() {
 		return value(null);
 	}
-	
+
 	public DataWriter value(boolean value) {
 		return value(value ? "true" : "false");
 	}
-	
+
 	private DataWriter writeJSONObject(JSONObject json) {
 		if (mode == JSON) {
 			writeValueStart();
@@ -207,24 +208,24 @@ public class DataWriter {
 		}
 		return this;
 	}
-	
+
 	private void writeValueStart() {
 		if (mode == JSON && (state().isArray || state().isObject) && state().hasSomething)
 			write(",");
 		state().hasSomething = true;
-		
+
 		if (state().isArray) {
 			states.push(new State());
 			state().isListItem = true;
-			
+
 			if (mode == XML)
 				write("<item>");
 			else if (mode == HTML)
 				write("\n<li>");
 		}
-		
+
 	}
-	
+
 	private void writeValueEnd() {
 		if (state().isKey){
 			if (mode == XML)
@@ -234,13 +235,13 @@ public class DataWriter {
 
 			states.pop();
 		}
-		
+
 		else if (state().isListItem) {
 			if (mode == XML)
 				write("</item>");
 			if (mode == HTML)
 				write("</li>");
-			
+
 			states.pop();
 		}
 	}
@@ -248,7 +249,7 @@ public class DataWriter {
 	private State state() {
 		return states.peek();
 	}
-	
+
 	private DataWriter write(String data) {
 		try {
 			this.writer.write(data.getBytes(RestServices.UTF8));
@@ -257,7 +258,7 @@ public class DataWriter {
 		}
 		return this;
 	}
-	
+
 	private void assrt(boolean value, String msg) {
 		if (!value)
 			throw new IllegalStateException(this.getClass().getName() + " " + msg);

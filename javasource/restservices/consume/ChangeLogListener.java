@@ -21,9 +21,9 @@ import java.util.Map;
 
 import org.apache.commons.httpclient.HttpException;
 import org.apache.commons.httpclient.methods.GetMethod;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.json.JSONTokener;
+import com.mendix.thirdparty.org.json.JSONException;
+import com.mendix.thirdparty.org.json.JSONObject;
+import com.mendix.thirdparty.org.json.JSONTokener;
 
 import restservices.RestServices;
 import restservices.proxies.DataSyncState;
@@ -54,34 +54,34 @@ public class ChangeLogListener {
 	private volatile GetMethod currentRequest;
 	private Thread listenerThread;
 	private volatile boolean isConnected = false;
-	
-	
+
+
 	private ChangeLogListener(String collectionUrl, String onUpdateMF, String onDeleteMF, long timeout) throws Exception {
 		checkNotNull(collectionUrl, "URL should not be null");
 		checkArgument(isNotEmpty(onUpdateMF), "On update should be non empty");
 		checkArgument(isNotEmpty(onDeleteMF), "On delete should be non empty");
-		
+
 		this.url = collectionUrl;
 		this.onUpdateMF = onUpdateMF;
 		this.onDeleteMF = onDeleteMF;
 		this.timeout = timeout;
 		this.state = XPath.create(Core.createSystemContext(), DataSyncState.class).findOrCreate(DataSyncState.MemberNames.CollectionUrl, url);
 	}
-	
+
 	public ChangeLogListener follow() {
 		synchronized (activeListeners) {
 			if (activeListeners.containsKey(url))
 				throw new IllegalStateException("Already listening to " + url);
-		
+
 			activeListeners.put(url, this);
 		}
-		
-		
+
+
 		headers = RestConsumer.nextHeaders.get();
 		RestConsumer.nextHeaders.set(null);
-		
+
 		this.listenerThread = (new Thread() {
-			
+
 			private long nextRetryTime = 10000;
 			@Override
 			public void run() {
@@ -103,7 +103,7 @@ public class ChangeLogListener {
 				}
 			}
 		});
-		
+
 		listenerThread.setName("REST consume thread " + url);
 		listenerThread.start();
 		return this;
@@ -112,10 +112,10 @@ public class ChangeLogListener {
 	void startConnection() throws IOException,
 			HttpException {
 		String requestUrl = getChangesRequestUrl(true);
-		
+
 		GetMethod get = this.currentRequest = new GetMethod(requestUrl);
 		get.setRequestHeader(RestServices.HEADER_ACCEPT, RestServices.CONTENTTYPE_APPLICATIONJSON);
-		
+
 		RestConsumer.includeHeaders(get, headers);
 		int status = RestConsumer.client.executeMethod(get);
 		try {
@@ -123,15 +123,15 @@ public class ChangeLogListener {
 				throw new RuntimeException("Failed to setup stream to " + url +  ", status: " + status);
 
 			InputStream inputStream = get.getResponseBodyAsStream();
-		
+
 			JSONTokener jt = new JSONTokener(inputStream);
 			JSONObject instr = null;
-			
+
 			try {
 				isConnected  = true;
 				while(true) {
 					instr = new JSONObject(jt);
-					
+
 					processChange(instr);
 				}
 			}
@@ -172,17 +172,17 @@ public class ChangeLogListener {
 				}
 				return true;
 			}
-			
+
 		});
 	}
-	
+
 	void processChange(JSONObject instr) throws Exception {
 		IContext c = Core.createSystemContext();
 
-		long revision = instr.getLong(CHANGE_SEQNR); 
+		long revision = instr.getLong(CHANGE_SEQNR);
 
-		RestServices.LOGCONSUME.info("Receiving update for " + url + " #" + revision + " object: '" + instr.getString(CHANGE_KEY) + "'"); 
-		
+		RestServices.LOGCONSUME.info("Receiving update for " + url + " #" + revision + " object: '" + instr.getString(CHANGE_KEY) + "'");
+
 		if (instr.getBoolean(CHANGE_DELETED)) {
 			Map<String, String> args = Utils.getArgumentTypes(onDeleteMF);
 			if (args.size() != 1 || !"String".equals(args.values().iterator().next()))
@@ -199,14 +199,14 @@ public class ChangeLogListener {
 			Core.commit(c, target);
 			Core.execute(c, onUpdateMF, ImmutableMap.of(Utils.getArgumentTypes(onUpdateMF).keySet().iterator().next(), (Object) target));
 		}
-		
-		if (revision <= state.getSequenceNr()) 
+
+		if (revision <= state.getSequenceNr())
 			RestServices.LOGCONSUME.warn("Received revision (" + revision + ") is smaller than the latest known revision (" + state.getSequenceNr() +"), probably the collections are out of sync?");
-		
+
 		state.setSequenceNr(revision);
 		state.commit();
 	}
-	
+
 	private void close() {
 		activeListeners.remove(url);
 		cancelled = true;
@@ -220,12 +220,12 @@ public class ChangeLogListener {
 			final String deleteMicroflow, final long timeout) throws HttpException, IOException, Exception {
 		new ChangeLogListener(collectionUrl, updateMicroflow, deleteMicroflow, timeout).follow();
 	}
-	
+
 	public static synchronized void unfollow(String collectionUrl) {
 		if (activeListeners.containsKey(collectionUrl))
 			activeListeners.get(collectionUrl).close();
 	}
-	
+
 	public static synchronized void fetch(String collectionUrl, String updateMicroflow, String deleteMicroflow) throws Exception {
 		new ChangeLogListener(collectionUrl, updateMicroflow, deleteMicroflow, 0L).fetch();
 	}

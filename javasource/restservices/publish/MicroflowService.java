@@ -19,7 +19,7 @@ import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.json.JSONObject;
+import com.mendix.thirdparty.org.json.JSONObject;
 
 import restservices.RestServices;
 import restservices.proxies.HttpMethod;
@@ -56,7 +56,7 @@ public class MicroflowService implements IRestServiceHandler{
 	private HttpMethod httpMethod;
 	private boolean isFileSource = false;
 	private boolean isFileTarget = false;
-	
+
 	private static final ServletFileUpload servletFileUpload = new ServletFileUpload(new DiskFileItemFactory(100000, new File(System.getProperty("java.io.tmpdir"))));
 	private String relativeUrl;
 	private HandlerRegistration serviceHandler;
@@ -68,17 +68,17 @@ public class MicroflowService implements IRestServiceHandler{
 		checkNotNull(microflowname);
 		checkNotNull(roleOrMicroflow);
 		checkNotNull(httpMethod);
-		
+
 		this.microflowname = microflowname;
 		this.roleOrMicroflow = roleOrMicroflow;
 		this.description = description;
 		this.httpMethod = httpMethod;
-		
+
 		if (pathTemplateString != null)
 			this.relativeUrl = Utils.removeLeadingAndTrailingSlash(pathTemplateString);
 		else
 			this.relativeUrl = microflowname.split("\\.")[1].toLowerCase();
-			
+
 		this.consistencyCheck();
 
 		register();
@@ -86,7 +86,7 @@ public class MicroflowService implements IRestServiceHandler{
 
 	private void register() {
 		unregister();
-		
+
 		microflowServices.add(this);
 		serviceHandler = RestServiceHandler.registerServiceHandler(httpMethod, getRelativeUrl(), roleOrMicroflow, this);
 		metaserviceHandler = RestServiceHandler.registerServiceHandlerMetaUrl(getRelativeUrl());
@@ -121,12 +121,12 @@ public class MicroflowService implements IRestServiceHandler{
 			throw new IllegalArgumentException("Cannot publish microflow " + microflowname + ", it should exist and have exactly zero or one argument");
 
 		hasArgument = argCount == 1;
-		
+
 		List<String> pathParams = new UriTemplate(relativeUrl).getTemplateVariables();
 		if (pathParams.size() > 0 && !hasArgument) {
 			throw new IllegalArgumentException("Cannot publish microflow " + microflowname + " with path '" + relativeUrl + ", the microflow should have a single input argument object with at least attributes " + pathParams);
 		}
-		
+
 		if (hasArgument) {
 			IDataType argtype = Utils.getFirstArgumentType(microflowname);
 			if (!argtype.isMendixObject())
@@ -135,11 +135,11 @@ public class MicroflowService implements IRestServiceHandler{
 			this.argName = Utils.getArgumentTypes(microflowname).keySet().iterator().next();
 			isFileSource = Core.isSubClassOf(FileDocument.entityName, argType);
 
-			
+
 			IMetaObject metaObject = Core.getMetaObject(argType);
 			if (metaObject.isPersistable() && !isFileSource)
 				throw new IllegalArgumentException("Cannot publish microflow " + microflowname + ", it should have a transient object of filedocument as input argument");
-			
+
 			Set<String> metaPrimitiveNames = Sets.newHashSet();
 			for(IMetaPrimitive prim : metaObject.getMetaPrimitives()) {
 				metaPrimitiveNames.add(prim.getName().toLowerCase());
@@ -148,18 +148,18 @@ public class MicroflowService implements IRestServiceHandler{
 				if (!metaPrimitiveNames.contains(pathParam.toLowerCase()))
 					throw new IllegalArgumentException("Cannot publish microflow " + microflowname + ", its input argument should have an attribute with name '" + pathParam +"', as required by the template path");
 			}
-			
+
 		}
 
 		if (httpMethod == null) {
 			throw new IllegalArgumentException("Cannot publish microflow " + microflowname + ", it has no HTTP method defined.");
 		}
-			
+
 		IDataType returnTypeFromMF = Core.getReturnType(microflowname);
-		
+
 		if (returnTypeFromMF.isMendixObject() || returnTypeFromMF.isList()){
 			this.returnType = returnTypeFromMF.getObjectType();
-			isFileTarget = Core.isSubClassOf(FileDocument.entityName, this.returnType); 
+			isFileTarget = Core.isSubClassOf(FileDocument.entityName, this.returnType);
 
 			if (Core.getMetaObject(this.returnType).isPersistable()  && !isFileTarget)
 				throw new IllegalArgumentException("Cannot publish microflow " + microflowname+ ", its return type should be a non-persistable object or a file document");
@@ -176,15 +176,15 @@ public class MicroflowService implements IRestServiceHandler{
 		else {
 			Map<String, Object> args = new HashMap<String, Object>();
 			IMendixObject inputObject = parseInputData(rsr, params);
-			
-			if(inputObject != null) 
+
+			if(inputObject != null)
 				args.put(argName, inputObject);
-			
+
 			if (isReturnTypePrimitive)
 				rsr.setResponseContentType(ResponseType.PLAIN); //default, but might be overriden by the executing mf
 			else if (isFileTarget)
 				rsr.setResponseContentType(ResponseType.BINARY);
-	
+
 			Object result = Core.execute(rsr.getContext(), microflowname, args);
 			writeOutputData(rsr, result);
 		}
@@ -229,10 +229,10 @@ public class MicroflowService implements IRestServiceHandler{
 			throws IOException, ServletException, Exception {
 		if (!hasArgument)
 			return null;
-		
+
 		if (!Utils.hasDataAccess(Core.getMetaObject(argType), rsr.getContext()))
 			throw new IllegalStateException("Cannot instantiate object of type '" + argType + "', the object is not accessiable for users with role " + rsr.getContext().getSession().getUserRolesNames() + ". Please check the access rules");
-		
+
 		IMendixObject argObject = Core.instantiate(rsr.getContext(), argType);
 		JSONObject data = new JSONObject();
 
@@ -242,7 +242,7 @@ public class MicroflowService implements IRestServiceHandler{
 		}
 
 		//json data
-		else if (rsr.getRequestContentType() == RequestContentType.JSON || (rsr.getRequestContentType() == RequestContentType.OTHER && !isFileSource)) { 
+		else if (rsr.getRequestContentType() == RequestContentType.JSON || (rsr.getRequestContentType() == RequestContentType.OTHER && !isFileSource)) {
 			String body = IOUtils.toString(rsr.request.getInputStream());
 			data = new JSONObject(StringUtils.isEmpty(body) ? "{}" : body);
 		}
@@ -253,17 +253,17 @@ public class MicroflowService implements IRestServiceHandler{
 		}
 
 		RestServiceHandler.paramMapToJsonObject(params, data);
-		
+
 		//serialize to Mendix Object
 		JsonDeserializer.readJsonDataIntoMendixObject(rsr.getContext(), data, argObject, false);
-		
+
 		return argObject;
 	}
 
 	private void parseMultipartData(RestServiceRequest rsr, IMendixObject argO,
 			JSONObject data) throws IOException, FileUploadException {
 		boolean hasFile = false;
-		
+
 		for(FileItemIterator iter = servletFileUpload.getItemIterator(rsr.request); iter.hasNext();) {
 			FileItemStream item = iter.next();
 			if (!item.isFormField()){ //This is the file(?!)
@@ -316,7 +316,7 @@ public class MicroflowService implements IRestServiceHandler{
 
 		rsr.endDoc();
 	}
-	
+
 	public String getHttpMethod() {
 		return httpMethod == null ? null : httpMethod.toString();
 	}
